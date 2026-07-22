@@ -983,7 +983,7 @@
       <button class="sidebar-close" onclick="closeSidebar()">✕</button>
     </div>
     <nav id="nav-groups"></nav>
-    <div class="sidebar-footer">Demo Webapp &middot; Data Dummy<br/>Juli 2026</div>
+    <div class="sidebar-footer">Demo Webapp &middot; Data Dummy<br/><span id="last-update-info">Update terakhir: memuat&hellip;</span></div>
   </aside>
 
   <div class="main">
@@ -13261,6 +13261,48 @@ function exportLaporanGabunganExcel(){
 }
 
 /* =========================================================================
+   INFO UPDATE TERAKHIR — diambil dari commit terakhir di GitHub (repo public).
+   GANTI owner & repo di bawah ini sesuai repository Anda. Kalau fetch gagal
+   (repo private, offline, atau rate-limit API), otomatis pakai FALLBACK_DATE
+   yang perlu diupdate manual setiap kali Anda deploy.
+   ========================================================================= */
+const GITHUB_REPO_CONFIG = {
+  owner: 'namauser-github',     // <-- GANTI dengan username/organisasi GitHub Anda
+  repo: 'nama-repo-anda',       // <-- GANTI dengan nama repository Anda
+  filePath: 'index.html',       // sesuaikan kalau nama filenya berbeda
+};
+const FALLBACK_UPDATE_DATE = '2026-07-22T10:00:00+07:00'; // <-- update manual kalau tidak pakai GitHub API
+
+function formatUpdateTimestamp(isoString){
+  const d = new Date(isoString);
+  const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const tgl = d.toLocaleDateString('id-ID', {timeZone:'Asia/Jakarta'}) ? `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}` : '';
+  const jam = d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
+  return `${tgl}, ${jam} WIB`;
+}
+async function loadLastUpdateInfo(){
+  const el = document.getElementById('last-update-info');
+  if(!el) return;
+  const { owner, repo, filePath } = GITHUB_REPO_CONFIG;
+  const isConfigured = owner !== 'namauser-github' && repo !== 'nama-repo-anda';
+  if(!isConfigured){
+    el.textContent = `Update terakhir: ${formatUpdateTimestamp(FALLBACK_UPDATE_DATE)}`;
+    return;
+  }
+  try{
+    const url = `https://api.github.com/repos/${owner}/${repo}/commits?path=${encodeURIComponent(filePath)}&per_page=1`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('GitHub API error ' + res.status);
+    const data = await res.json();
+    const tanggalCommit = data[0]?.commit?.committer?.date || data[0]?.commit?.author?.date;
+    if(!tanggalCommit) throw new Error('Tanggal commit tidak ditemukan');
+    el.textContent = `Update terakhir: ${formatUpdateTimestamp(tanggalCommit)}`;
+  } catch(err){
+    el.textContent = `Update terakhir: ${formatUpdateTimestamp(FALLBACK_UPDATE_DATE)}`;
+  }
+}
+
+/* =========================================================================
    INIT
    ========================================================================= */
 function init(){
@@ -13269,6 +13311,7 @@ function init(){
   renderRoleChips();
   selectDemoRole('role-super');
   renderSidebar();
+  loadLastUpdateInfo();
 }
 init();
 
