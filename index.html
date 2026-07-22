@@ -100,6 +100,11 @@
   .sidebar-close{ all:unset; cursor:pointer; margin-left:auto; display:none; color:#E3C9C5; padding:4px; }
 
   .nav-group{ margin-bottom:6px; }
+  .nav-category-label{
+    padding:16px 20px 6px; font-size:11px; font-weight:700; letter-spacing:1.3px;
+    text-transform:uppercase; color:#B98F89;
+  }
+  .nav-category-label:first-child{ padding-top:6px; }
   .nav-group-head{
     all:unset; box-sizing:border-box; width:100%; display:flex; align-items:center; gap:10px;
     padding:11px 20px; cursor:pointer; font-size:14.5px; font-weight:700;
@@ -250,6 +255,7 @@
     body.printing #print-area th{ background:#F1E3E2 !important; color:#4A0A0D !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     body.printing #print-area th:empty{ display:none; }
     body.printing #print-area td:has(.row-actions){ display:none; }
+    body.printing #print-area th.aksi-col{ display:none; }
 
     /* Portofolio Siswa print override — compact, ink-friendly, multi-page OK */
     body.printing #print-area .portfolio-print .portfolio-card{ box-shadow:none; border:1px solid #ccc; }
@@ -2508,6 +2514,50 @@
         <div id="tagihan-result-wrap" style="display:none;"></div>
       </section>
 
+      <!-- ===== PAGE: TAGIHAN SPP PER KELAS (Modul F) ===== -->
+      <section class="page" id="page-sppkelas" data-title="Tagihan SPP per Kelas" data-path="Keuangan & SPP / Tagihan SPP per Kelas">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Tagihan SPP per Kelas</h3>
+              <p>Pilih kelas &amp; periode (bulan-tahun) untuk melihat status SPP seluruh siswa dalam satu kelas sekaligus — siap dicetak atau dibagikan ke wali kelas.</p>
+            </div>
+          </div>
+          <div class="table-toolbar" style="flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <select id="sppkelas-kelas" onchange="sppKelasOnKelasChange(this.value)" style="padding:9px 12px; border-radius:8px; border:1.5px solid var(--border); font-size:14px;"></select>
+              <select id="sppkelas-ta" onchange="sppKelasOnTaChange(this.value)" style="padding:9px 12px; border-radius:8px; border:1.5px solid var(--border); font-size:14px;"></select>
+              <div class="pg-btns">
+                <button onclick="sppKelasPrevBulan()" title="Bulan sebelumnya">&#8592;</button>
+                <span id="sppkelas-bulan-label" style="font-weight:700; min-width:110px; text-align:center; display:inline-block;">&nbsp;</span>
+                <button onclick="sppKelasNextBulan()" title="Bulan berikutnya">&#8594;</button>
+              </div>
+            </div>
+            <div class="export-btns">
+              <button class="btn-export xls" onclick="exportExcel('sppkelas-table', sppKelasExportTitle())">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                Excel
+              </button>
+              <button class="btn-export pdf" onclick="exportPDF('sppkelas-table', sppKelasExportTitle())">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                Cetak / PDF
+              </button>
+              <button class="btn btn-outline btn-sm btn-share-wa" onclick="shareTagihanKelasWA()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a7.5 7.5 0 0 1-10.8 6.7L4 20l1.9-5.7A7.5 7.5 0 1 1 21 11.5z"/></svg>
+                Bagikan Rekap WA
+              </button>
+            </div>
+          </div>
+          <div id="sppkelas-summary" class="stat-strip" style="margin-bottom:16px;"></div>
+          <div class="table-wrap">
+            <table id="sppkelas-table">
+              <thead><tr><th>No</th><th>Nama Siswa</th><th>NIS</th><th>Nominal SPP</th><th>Status</th><th>Sisa Tagihan</th><th></th></tr></thead>
+              <tbody id="sppkelas-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== PAGE: PEMBAYARAN (Modul F) ===== -->
       <section class="page" id="page-pembayaran" data-title="Pembayaran" data-path="Keuangan & SPP / Pembayaran">
         <div class="card">
@@ -4407,6 +4457,7 @@ const MODULE_D_PAGES = [
 const MODULE_F_PAGES = [
   { id:'tagihan', label:'Tagihan & Biaya' },
   { id:'spppesertadidik', label:'SPP Peserta Didik' },
+  { id:'sppkelas', label:'Tagihan SPP per Kelas' },
   { id:'pembayaran', label:'Pembayaran' },
   { id:'kwitansi', label:'Invoice & Kwitansi Digital' },
   { id:'tunggakan', label:'Rekap Tunggakan' },
@@ -4482,6 +4533,16 @@ const ACTIVE_MODULES = [
   { code:'J', title:'Akses Multi-Device', pages: MODULE_J_PAGES },
   { code:'A', title:'Keamanan & Konfigurasi Dasar', pages: MODULE_A_PAGES },
 ];
+/* Pengelompokan modul jadi kategori untuk tampilan sidebar. Dashboard & Laporan
+   sengaja tidak diberi label kategori (berdiri sendiri di paling atas, sesuai
+   pola umum: halaman ringkasan lintas-modul biasa tidak ikut dikategorikan). */
+const NAV_CATEGORIES = [
+  { label: null, moduleCodes: ['I'] },
+  { label: 'Akademik & Kesiswaan', moduleCodes: ['B', 'C', 'D', 'G', 'K'] },
+  { label: 'Keuangan', moduleCodes: ['F'] },
+  { label: 'Layanan Pendukung', moduleCodes: ['E', 'H'] },
+  { label: 'Sistem & Administrasi', moduleCodes: ['J', 'A'] },
+];
 const LOCKED_MODULES = [];
 
 /* Minimalist line-icon set (stroke, 24x24 viewBox) — one per module code. */
@@ -4502,20 +4563,28 @@ const MODULE_ICONS = {
 function renderSidebar(){
   const wrap = document.getElementById('nav-groups');
   let html = '';
-  ACTIVE_MODULES.forEach((m, i) => {
-    html += `
-      <div class="nav-group ${i === 0 ? 'open' : ''}" id="group-${m.code}">
-        <button class="nav-group-head" onclick="toggleGroup('${m.code}')">
-          ${MODULE_ICONS[m.code]}
-          <span>${m.title}</span>
-          <span class="chev">&#9656;</span>
-        </button>
-        <div class="nav-pages">
-          ${m.pages.map(p => `<button class="nav-page" id="nav-${p.id}" onclick="goToPage('${p.id}')">${p.label}</button>`).join('')}
+  let firstGroupRendered = false;
+  NAV_CATEGORIES.forEach(cat => {
+    const modulesInCat = cat.moduleCodes.map(code => ACTIVE_MODULES.find(m => m.code === code)).filter(Boolean);
+    if(!modulesInCat.length) return;
+    if(cat.label) html += `<div class="nav-category-label">${cat.label}</div>`;
+    modulesInCat.forEach(m => {
+      html += `
+        <div class="nav-group ${!firstGroupRendered ? 'open' : ''}" id="group-${m.code}">
+          <button class="nav-group-head" onclick="toggleGroup('${m.code}')">
+            ${MODULE_ICONS[m.code]}
+            <span>${m.title}</span>
+            <span class="chev">&#9656;</span>
+          </button>
+          <div class="nav-pages">
+            ${m.pages.map(p => `<button class="nav-page" id="nav-${p.id}" onclick="goToPage('${p.id}')">${p.label}</button>`).join('')}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+      firstGroupRendered = true;
+    });
   });
+  if(LOCKED_MODULES.length) html += `<div class="nav-category-label">Segera Hadir</div>`;
   LOCKED_MODULES.forEach(m => {
     html += `
       <div class="nav-group">
@@ -4572,6 +4641,7 @@ function renderAllForPage(pageId){
   if(pageId === 'portofolioguru'){ renderPortofolioGuruCard(); }
   if(pageId === 'tagihan'){ tblTarifSPP.render(); tblTarifBiayaLain.render(); }
   if(pageId === 'spppesertadidik'){ renderTagihanCard(); }
+  if(pageId === 'sppkelas'){ initSppKelasState(); renderSppKelasTable(); }
   if(pageId === 'pembayaran'){ tblPembayaran.render(); }
   if(pageId === 'kwitansi'){ tblInvoiceTagihan.render(); tblKwitansi.render(); }
   if(pageId === 'tunggakan'){ tblTunggakan.render(); }
@@ -7540,6 +7610,7 @@ function shareKwitansiWA(kwitansiId){
   const s = findSiswa(k.siswaId);
   const kontak = s ? siswaKontakOrtu(s) : { hp:'' };
   if(!kontak.hp) showToast('No. HP orang tua/wali belum tercatat untuk siswa ini — WhatsApp dibuka tanpa nomor tujuan, pilih kontak secara manual.');
+  if(s) createNotifikasi('Tagihan', 'WhatsApp', 'Siswa', s.id, kwitansiShareText(k), kontak.hp ? 'Terkirim' : 'Gagal');
   openWhatsApp(kontak.hp, kwitansiShareText(k));
 }
 function shareKwitansiEmail(kwitansiId){
@@ -7548,6 +7619,7 @@ function shareKwitansiEmail(kwitansiId){
   const s = findSiswa(k.siswaId);
   const kontak = s ? siswaKontakOrtu(s) : { email:'' };
   if(!kontak.email) showToast('Email belum tercatat untuk siswa ini — lengkapi alamat penerima secara manual.');
+  if(s) createNotifikasi('Tagihan', 'Email', 'Siswa', s.id, kwitansiShareText(k), kontak.email ? 'Terkirim' : 'Gagal');
   openEmailDraft(kontak.email, `Kwitansi Pembayaran ${k.noKwitansi} - ${s.nama}`, kwitansiShareText(k));
 }
 function shareInvoiceWA(invoiceId){
@@ -7557,6 +7629,7 @@ function shareInvoiceWA(invoiceId){
   const s = t ? findSiswa(t.siswaId) : null;
   const kontak = s ? siswaKontakOrtu(s) : { hp:'' };
   if(!kontak.hp) showToast('No. HP orang tua/wali belum tercatat untuk siswa ini — WhatsApp dibuka tanpa nomor tujuan, pilih kontak secara manual.');
+  if(s) createNotifikasi('Tagihan', 'WhatsApp', 'Siswa', s.id, invoiceShareText(inv), kontak.hp ? 'Terkirim' : 'Gagal');
   openWhatsApp(kontak.hp, invoiceShareText(inv));
 }
 function shareInvoiceEmail(invoiceId){
@@ -7566,6 +7639,7 @@ function shareInvoiceEmail(invoiceId){
   const s = t ? findSiswa(t.siswaId) : null;
   const kontak = s ? siswaKontakOrtu(s) : { email:'' };
   if(!kontak.email) showToast('Email belum tercatat untuk siswa ini — lengkapi alamat penerima secara manual.');
+  if(s) createNotifikasi('Tagihan', 'Email', 'Siswa', s.id, invoiceShareText(inv), kontak.email ? 'Terkirim' : 'Gagal');
   openEmailDraft(kontak.email, `Tagihan ${inv.noInvoice} - ${s.nama}`, invoiceShareText(inv));
 }
 function siswaTagihanByYear(siswaId){
@@ -7579,6 +7653,28 @@ function tagihanStatusBadgeClass(status){
 }
 function tagihanStatusLabel(status){
   return status === 'Lunas' ? 'LUNAS' : status === 'Sebagian' ? 'SEBAGIAN' : 'BLM LUNAS';
+}
+/* ---- Kolom Aksi pada tabel SPP/Biaya Lain (halaman SPP Peserta Didik) ----
+   Belum Lunas/Sebagian -> tombol "Bayar" membuka form Pembayaran (siswa &
+   tagihan sudah terisi otomatis). Lunas -> ikon mata membuka Kwitansi
+   (bukti bayar resmi, diterbitkan otomatis setelah pembayaran tercatat). */
+function renderTagihanAksiCell(t, siswaId){
+  if(t.status === 'Lunas'){
+    return `<div class="row-actions"><button class="btn btn-outline btn-icon" title="Lihat Detail Pembayaran (Kwitansi)" onclick="lihatPembayaranTagihan('${t.id}')">&#128065;</button></div>`;
+  }
+  return `<div class="row-actions"><button class="btn btn-primary btn-sm" onclick="bayarTagihanDariSpp('${siswaId}','${t.id}')">Bayar</button></div>`;
+}
+function bayarTagihanDariSpp(siswaId, tagihanId){
+  goToPage('pembayaran');
+  openPembayaranForm(null, siswaId, tagihanId);
+}
+function lihatPembayaranTagihan(tagihanId){
+  const pembayaranList = DB.pembayaran.filter(p => p.tagihanId === tagihanId);
+  if(!pembayaranList.length){ showToast('Belum ada data pembayaran tercatat untuk tagihan ini.', 'error'); return; }
+  const terbaru = [...pembayaranList].sort((a, b) => new Date(b.tanggalBayar) - new Date(a.tanggalBayar))[0];
+  const kw = DB.kwitansi.find(k => k.pembayaranId === terbaru.id);
+  if(!kw){ showToast('Kwitansi untuk pembayaran ini tidak ditemukan.', 'error'); return; }
+  viewKwitansi(kw.id);
 }
 
 /* ---- Seed riwayat tagihan, pembayaran & kwitansi (dijalankan sekali setelah DB.siswa & DB.mutasi siap) ---- */
@@ -9843,7 +9939,7 @@ function renderSppYearBlock(s, group, history, openByDefault){
       </button>
       <div class="spp-year-body">
         <table class="pf-table spp-table">
-          <thead><tr><th class="spp-no">No</th><th>Bulan</th><th class="spp-nominal">Nominal</th><th>Lunas / Blm Lunas</th></tr></thead>
+          <thead><tr><th class="spp-no">No</th><th>Bulan</th><th class="spp-nominal">Nominal</th><th>Lunas / Blm Lunas</th><th class="aksi-col">Aksi</th></tr></thead>
           <tbody>
             ${spp.map((t, i) => `
               <tr>
@@ -9851,18 +9947,19 @@ function renderSppYearBlock(s, group, history, openByDefault){
                 <td>${t.bulan} ${t.tahunAjaran}</td>
                 <td class="spp-nominal">${fmtRupiah(t.nominal)}</td>
                 <td><span class="badge ${tagihanStatusBadgeClass(t.status)}">${tagihanStatusLabel(t.status)}</span></td>
+                <td>${renderTagihanAksiCell(t, s.id)}</td>
               </tr>
             `).join('')}
           </tbody>
           <tfoot>
-            <tr><td colspan="2">Total SPP Tahun Ajaran ${group.tahunAjaran}</td><td class="spp-nominal">${fmtRupiah(spp.reduce((sum, t) => sum + t.nominal, 0))}</td><td></td></tr>
+            <tr><td colspan="2">Total SPP Tahun Ajaran ${group.tahunAjaran}</td><td class="spp-nominal">${fmtRupiah(spp.reduce((sum, t) => sum + t.nominal, 0))}</td><td></td><td></td></tr>
           </tfoot>
         </table>
 
         ${biayaLain.length ? `
           <div class="spp-subheading">Biaya Lain-lain &mdash; Tahun Ajaran ${group.tahunAjaran}</div>
           <table class="pf-table spp-table">
-            <thead><tr><th>Nama Biaya</th><th>Kategori</th><th class="spp-nominal">Nominal</th><th>Status</th></tr></thead>
+            <thead><tr><th>Nama Biaya</th><th>Kategori</th><th class="spp-nominal">Nominal</th><th>Status</th><th class="aksi-col">Aksi</th></tr></thead>
             <tbody>
               ${biayaLain.map(t => `
                 <tr>
@@ -9870,6 +9967,7 @@ function renderSppYearBlock(s, group, history, openByDefault){
                   <td>${t.kategori || '—'}</td>
                   <td class="spp-nominal">${fmtRupiah(t.nominal)}</td>
                   <td><span class="badge ${tagihanStatusBadgeClass(t.status)}">${tagihanStatusLabel(t.status)}</span></td>
+                  <td>${renderTagihanAksiCell(t, s.id)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -9956,6 +10054,164 @@ function exportTagihanPDF(){
 }
 
 /* =========================================================================
+   PAGE — TAGIHAN SPP PER KELAS (Modul F)
+   Rekap status SPP satu kelas penuh untuk satu bulan-tahun ajaran tertentu —
+   siap dicetak/diekspor atau dibagikan ringkasannya ke wali kelas via WA.
+   ========================================================================= */
+let sppKelasState = { kelas: null, ta: null, bulanIdx: 0 };
+
+function initSppKelasState(){
+  const kelasSorted = [...DB.kelas].sort((a, b) => a.tingkat - b.tingkat || a.nama.localeCompare(b.nama));
+  const taSorted = [...DB.tahunAjaran].sort((a, b) => new Date(a.tglMulai) - new Date(b.tglMulai));
+  if(!sppKelasState.kelas && kelasSorted.length) sppKelasState.kelas = kelasSorted[0].nama;
+  if(!sppKelasState.ta){
+    const aktif = taSorted.find(t => t.status === 'aktif');
+    sppKelasState.ta = aktif ? aktif.label : (taSorted[taSorted.length - 1]?.label || null);
+  }
+  if(sppKelasState.bulanIdx === null || sppKelasState.bulanIdx === undefined){
+    const namaBulanSekarang = BULAN_NAMA[new Date(clock).getMonth()];
+    const idx = BULAN_TAHUN_AJARAN.indexOf(namaBulanSekarang);
+    sppKelasState.bulanIdx = idx >= 0 ? idx : 0;
+  }
+
+  const kelasSel = document.getElementById('sppkelas-kelas');
+  kelasSel.innerHTML = kelasSorted.map(k => `<option value="${k.nama}" ${k.nama === sppKelasState.kelas ? 'selected' : ''}>Kelas ${k.nama}</option>`).join('');
+
+  const taSel = document.getElementById('sppkelas-ta');
+  taSel.innerHTML = taSorted.map(t => `<option value="${t.label}" ${t.label === sppKelasState.ta ? 'selected' : ''}>Tahun Ajaran ${t.label}</option>`).join('');
+}
+function sppKelasOnKelasChange(val){ sppKelasState.kelas = val; renderSppKelasTable(); }
+function sppKelasOnTaChange(val){ sppKelasState.ta = val; renderSppKelasTable(); }
+function sppKelasPrevBulan(){
+  if(sppKelasState.bulanIdx > 0){ sppKelasState.bulanIdx--; renderSppKelasTable(); return; }
+  const taSorted = [...DB.tahunAjaran].sort((a, b) => new Date(a.tglMulai) - new Date(b.tglMulai));
+  const curIdx = taSorted.findIndex(t => t.label === sppKelasState.ta);
+  if(curIdx > 0){
+    sppKelasState.ta = taSorted[curIdx - 1].label;
+    sppKelasState.bulanIdx = 11;
+    document.getElementById('sppkelas-ta').value = sppKelasState.ta;
+    renderSppKelasTable();
+  } else {
+    showToast('Tidak ada data Tahun Ajaran sebelumnya.');
+  }
+}
+function sppKelasNextBulan(){
+  if(sppKelasState.bulanIdx < 11){ sppKelasState.bulanIdx++; renderSppKelasTable(); return; }
+  const taSorted = [...DB.tahunAjaran].sort((a, b) => new Date(a.tglMulai) - new Date(b.tglMulai));
+  const curIdx = taSorted.findIndex(t => t.label === sppKelasState.ta);
+  if(curIdx >= 0 && curIdx < taSorted.length - 1){
+    sppKelasState.ta = taSorted[curIdx + 1].label;
+    sppKelasState.bulanIdx = 0;
+    document.getElementById('sppkelas-ta').value = sppKelasState.ta;
+    renderSppKelasTable();
+  } else {
+    showToast('Tidak ada data Tahun Ajaran berikutnya.');
+  }
+}
+function sppKelasCurrentBulan(){ return BULAN_TAHUN_AJARAN[sppKelasState.bulanIdx]; }
+function sppKelasExportTitle(){
+  return `Tagihan SPP Kelas ${sppKelasState.kelas} - ${sppKelasCurrentBulan()} (TA ${sppKelasState.ta})`;
+}
+function renderSppKelasTable(){
+  const labelEl = document.getElementById('sppkelas-bulan-label');
+  const bodyEl = document.getElementById('sppkelas-table-body');
+  const summaryEl = document.getElementById('sppkelas-summary');
+  if(!labelEl || !bodyEl || !summaryEl) return;
+  const bulan = sppKelasCurrentBulan();
+  labelEl.textContent = `${bulan} ${sppKelasState.ta || ''}`;
+
+  const siswaKelas = DB.siswa
+    .filter(s => s.kelas === sppKelasState.kelas && s.statusSiswa === 'Aktif')
+    .sort((a, b) => a.nama.localeCompare(b.nama));
+
+  let totalNominal = 0, totalSisa = 0, jumlahLunas = 0;
+
+  if(!siswaKelas.length){
+    bodyEl.innerHTML = `<tr><td colspan="7"><div class="empty-state">Tidak ada siswa aktif pada kelas ini.</div></td></tr>`;
+  } else {
+    bodyEl.innerHTML = siswaKelas.map((s, i) => {
+      const t = DB.tagihan.find(tg => tg.siswaId === s.id && tg.jenis === 'SPP' && tg.bulan === bulan && tg.tahunAjaran === sppKelasState.ta);
+      if(!t){
+        return `<tr><td>${i + 1}</td><td><strong>${s.nama}</strong></td><td>${s.nis}</td><td colspan="3" class="muted-sm">Belum terdaftar pada tahun ajaran ini</td><td></td></tr>`;
+      }
+      const sisa = sisaTagihan(t);
+      totalNominal += t.nominal; totalSisa += sisa;
+      if(t.status === 'Lunas') jumlahLunas++;
+      const kontak = siswaKontakOrtu(s);
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${s.nama}</strong></td>
+          <td>${s.nis}</td>
+          <td>${fmtRupiah(t.nominal)}</td>
+          <td><span class="badge ${tagihanStatusBadgeClass(t.status)}">${tagihanStatusLabel(t.status)}</span></td>
+          <td>${fmtRupiah(sisa)}</td>
+          <td>
+            <button class="btn btn-outline btn-icon" title="Ingatkan via WA" onclick="shareTagihanSiswaWA('${s.id}','${t.id}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a7.5 7.5 0 0 1-10.8 6.7L4 20l1.9-5.7A7.5 7.5 0 1 1 21 11.5z"/></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  summaryEl.innerHTML = `
+    <div class="stat-chip"><div class="num">${siswaKelas.length}</div><div class="lbl">Jumlah Siswa</div></div>
+    <div class="stat-chip blue"><div class="num">${fmtRupiah(totalNominal)}</div><div class="lbl">Total Tagihan SPP</div></div>
+    <div class="stat-chip gold"><div class="num">${jumlahLunas}/${siswaKelas.length}</div><div class="lbl">Sudah Lunas</div></div>
+    <div class="stat-chip red"><div class="num">${fmtRupiah(totalSisa)}</div><div class="lbl">Sisa Tunggakan</div></div>
+  `;
+}
+function shareTagihanSiswaWA(siswaId, tagihanId){
+  const s = findSiswa(siswaId);
+  const t = findTagihan(tagihanId);
+  if(!s || !t){ showToast('Data tidak ditemukan.', 'error'); return; }
+  const kontak = siswaKontakOrtu(s);
+  const sisa = sisaTagihan(t);
+  const text = `Assalamu'alaikum, Bapak/Ibu Wali dari ananda ${s.nama} (Kelas ${s.kelas}).\n\n`
+    + `Kami sampaikan informasi SPP bulan ${t.bulan} ${t.tahunAjaran}:\n`
+    + `Nominal      : ${fmtRupiah(t.nominal)}\n`
+    + `Status       : ${tagihanStatusLabel(t.status)}\n`
+    + (sisa > 0 ? `Sisa Tagihan : ${fmtRupiah(sisa)}\n\n` : `\n`)
+    + `Terima kasih.\n\nHormat kami,\nBendahara ${DB.settings.namaSekolah}`;
+  if(!kontak.hp) showToast('Nomor HP orang tua belum tercatat — silakan lengkapi data siswa.');
+  createNotifikasi('Tagihan', 'WhatsApp', 'Siswa', s.id, text, kontak.hp ? 'Terkirim' : 'Gagal');
+  openWhatsApp(kontak.hp, text);
+}
+/* Rekap kelas dibagikan sebagai SATU pesan WA gabungan (bukan per-siswa), tapi
+   riwayat notifikasinya tetap dicatat per-siswa — mengikuti pola yang sama
+   dengan broadcast Pengumuman (kirimNotifikasiPengumuman) — supaya konsisten
+   dengan riwayat di Komunikasi > Notifikasi WA/Email. */
+function shareTagihanKelasWA(){
+  const bulan = sppKelasCurrentBulan();
+  const siswaKelas = DB.siswa.filter(s => s.kelas === sppKelasState.kelas && s.statusSiswa === 'Aktif').sort((a, b) => a.nama.localeCompare(b.nama));
+  if(!siswaKelas.length){ showToast('Tidak ada siswa pada kelas ini.', 'error'); return; }
+  const kelasInfo = DB.kelas.find(k => k.nama === sppKelasState.kelas);
+  let totalSisa = 0, jumlahLunas = 0;
+  const baris = siswaKelas.map((s, i) => {
+    const t = DB.tagihan.find(tg => tg.siswaId === s.id && tg.jenis === 'SPP' && tg.bulan === bulan && tg.tahunAjaran === sppKelasState.ta);
+    if(!t) return `${i + 1}. ${s.nama} — belum terdaftar`;
+    const sisa = sisaTagihan(t);
+    totalSisa += sisa;
+    if(t.status === 'Lunas') jumlahLunas++;
+    return `${i + 1}. ${s.nama} — ${tagihanStatusLabel(t.status)}${sisa > 0 ? ` (sisa ${fmtRupiah(sisa)})` : ''}`;
+  }).join('\n');
+  const text = `Rekap SPP Kelas ${sppKelasState.kelas} — ${bulan} ${sppKelasState.ta}\n`
+    + `Wali Kelas: ${kelasInfo ? kelasInfo.waliNama : '—'}\n\n`
+    + `${baris}\n\n`
+    + `Lunas: ${jumlahLunas}/${siswaKelas.length} siswa · Total sisa tunggakan: ${fmtRupiah(totalSisa)}\n\n`
+    + `Dibagikan dari Sistem Manajemen ${DB.settings.namaSekolah}.`;
+  const ringkasanPesan = `[Rekap SPP Kelas ${sppKelasState.kelas} - ${bulan} ${sppKelasState.ta}] Lunas ${jumlahLunas}/${siswaKelas.length} siswa, sisa tunggakan ${fmtRupiah(totalSisa)}.`;
+  siswaKelas.forEach(s => {
+    const kontak = siswaKontakOrtu(s);
+    createNotifikasi('Tagihan', 'WhatsApp', 'Siswa', s.id, ringkasanPesan, kontak.hp ? 'Terkirim' : 'Gagal');
+  });
+  openWhatsApp('', text);
+}
+
+/* =========================================================================
+
    PAGE 25 — PEMBAYARAN (Modul F) — mendukung cicilan (pembayaran sebagian)
    ========================================================================= */
 const tblPembayaran = createTableController({
@@ -10005,14 +10261,14 @@ function refreshPembayaranTagihanOptions(includeTagihanId){
   const siswaId = document.getElementById('pmf-siswa').value;
   document.getElementById('pmf-tagihan').innerHTML = tagihanBelumLunasOptions(siswaId, null, includeTagihanId);
 }
-function openPembayaranForm(pembayaranId){
+function openPembayaranForm(pembayaranId, presetSiswaId, presetTagihanId){
   const editing = !!pembayaranId;
   const p = editing ? DB.pembayaran.find(x => x.id === pembayaranId) : null;
-  const siswaId = p ? p.siswaId : (DB.siswa[0] ? DB.siswa[0].id : '');
+  const siswaId = p ? p.siswaId : (presetSiswaId || (DB.siswa[0] ? DB.siswa[0].id : ''));
   openModal(editing ? 'Ubah Pembayaran' : 'Catat Pembayaran Baru', 'Pilih siswa lalu pilih tagihan yang belum lunas — sistem mendukung pembayaran cicilan (nominal boleh kurang dari sisa tagihan).', `
     <div class="form-grid">
       ${field('Nama Siswa', `<select id="pmf-siswa" onchange="refreshPembayaranTagihanOptions(${editing ? `'${pembayaranId}'` : 'null'})">${pembayaranSiswaOptions(siswaId)}</select>`, true)}
-      ${field('Tagihan', `<select id="pmf-tagihan">${tagihanBelumLunasOptions(siswaId, p ? p.tagihanId : null, p ? p.tagihanId : null)}</select>`, true)}
+      ${field('Tagihan', `<select id="pmf-tagihan">${tagihanBelumLunasOptions(siswaId, p ? p.tagihanId : presetTagihanId, p ? p.tagihanId : presetTagihanId)}</select>`, true)}
       ${field('Tanggal Bayar', `<input type="date" id="pmf-tanggal" value="${p ? p.tanggalBayar : ''}">`)}
       ${field('Nominal Dibayar (Rp)', `<input type="number" id="pmf-nominal" min="0" value="${p ? p.nominalDibayar : ''}">`)}
       ${field('Metode Pembayaran', `<select id="pmf-metode">${METODE_PEMBAYARAN_LIST.map(m => `<option ${p && p.metodePembayaran === m ? 'selected' : ''}>${m}</option>`).join('')}</select>`)}
